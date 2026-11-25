@@ -1525,11 +1525,11 @@ function renderLogin(){
       busy($('#go'), async () => {
         try{
           const {error} = await sb.auth.signInWithPassword({email:mail, password:pw.value});
-          if(error){ fail(/fetch|network/i.test(error.message) ? t('offline') : t('loginFail')); return false; }
+          if(error){ fail(/fetch|network/i.test(error.message) ? t('offline') + ' (' + tx('Supabase-Adresse prüfen','check the Supabase address') + ')' : /api key/i.test(error.message) ? tx('Der anon-Key in config.js stimmt nicht.','The anon key in config.js is wrong.') : t('loginFail')); return false; }
           const ok = await cloudLoad();
           if(asAdmin && !isAdmin){ await sb.auth.signOut(); fail(tx('Dieses Konto hat keinen Admin-Zugang.','This account has no admin access.')); return false; }
           return ok;
-        }catch(x){ fail(t('offline')); return false; }
+        }catch(x){ console.error(x); fail(t('offline') + (x && x.message ? ' (' + String(x.message).slice(0, 120) + ')' : '')); return false; }
       }, 0).then(ok => { if(ok) enter(); });
       return;
     }
