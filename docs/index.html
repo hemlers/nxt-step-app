@@ -823,6 +823,44 @@ h1,h2,h3,p,b,small,span,a,label,button{overflow-wrap:break-word}
 
 .adminpill{white-space:nowrap;flex:none}
 @media (max-width:360px){.adminpill span{display:none}.adminpill{padding-inline:12px}}
+
+/* v11: Admin-Login bewusst anders, Video ohne Zoom, ruhiger Play-Knopf, Notion-Dokumente */
+.lcard{position:relative;overflow:hidden;transition:background-color 280ms var(--io),box-shadow 280ms var(--io),color 280ms var(--io)}
+.lcard::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;opacity:0;transition:opacity 280ms var(--io);
+  background:repeating-linear-gradient(-45deg,var(--gold) 0 10px,#0B0B0B 10px 20px)}
+.lcard.adm{--ink:#F4F3EF;--mute:rgba(244,243,239,.62);--faint:rgba(244,243,239,.38);--line:rgba(232,187,61,.2);--line2:rgba(232,187,61,.34);
+  --panel:#15120A;--panel2:#1D1910;--fill:rgba(232,187,61,.1);--goldInk:#E8BB3D;--danger:#FF6B5E;color-scheme:dark;
+  color:var(--ink);background:linear-gradient(165deg,#221B0B 0%,#0E0C08 62%)!important;border-color:transparent!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  box-shadow:inset 0 0 0 1.5px var(--gold),0 16px 44px rgba(0,0,0,.45)!important}
+.lcard.adm::before{opacity:1}
+.lcard.adm .ltop{margin-top:6px}
+.lcard.adm .ltop b{color:var(--gold);letter-spacing:.01em}
+.lcard.adm .field input{background:#15120A;color:#F4F3EF}
+.lcard.adm .btn.gold{background:#F4F3EF;color:#0B0B0B}
+.lcard.adm #fg{visibility:hidden}
+.adnote{margin:0 4px;max-height:0;opacity:0;overflow:hidden;font-size:13.5px;line-height:1.45;color:var(--mute);
+  transition:max-height 280ms var(--io),opacity 200ms ease,margin 280ms var(--io)}
+.lcard.adm .adnote{max-height:90px;opacity:1;margin:-4px 4px 14px}
+.adnote .link{color:var(--gold);font-weight:700;padding:0;min-height:0;text-decoration:underline;text-underline-offset:2px}
+
+.vid .poster{animation:none!important;transform:none!important;object-position:50% 50%}
+.play{width:62px;height:62px;background:#F4F3EF;color:#0B0B0B;-webkit-backdrop-filter:none;backdrop-filter:none;
+  box-shadow:0 6px 24px rgba(0,0,0,.38),0 0 0 6px rgba(244,243,239,.14);transition:transform 160ms var(--out),box-shadow 200ms ease}
+.play::before{display:none}
+.play svg{width:22px;height:22px;transform:translateX(.5px)}
+@media (hover:hover) and (pointer:fine){.play:hover{transform:scale(1.06);box-shadow:0 8px 28px rgba(0,0,0,.42),0 0 0 8px rgba(244,243,239,.18)}}
+.play:active{transform:scale(.95)}
+
+.arow.ghost .amain small{color:var(--goldInk)}
+
+/* v11b: Admin ohne eigenes Profil – Spieleransicht nur als Vorschau */
+.pvstrip{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;margin:0 max(16px,env(safe-area-inset-right)) 14px max(16px,env(safe-area-inset-left));padding:10px 14px;border-radius:14px;
+  background:color-mix(in srgb,var(--gold) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 45%,transparent);font-size:14px;line-height:1.35}
+.pvstrip span{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--goldInk)}
+.pvstrip b{font-weight:800;min-width:0;overflow-wrap:anywhere}
+.pvstrip small{color:var(--mute);font-size:12.5px}
+.admin .abrow .close svg{width:20px;height:20px}
 </style>
 </head>
 <body>
@@ -1138,7 +1176,7 @@ async function cloudLoad(){
   snap.players = Object.fromEntries(D.players.map(p => [p.id, JSON.stringify(toDb(p))]));
   if(isAdmin && !c.paths) persist();
   const mine = D.players.find(p => p.user_id === user.id);
-  session = {email:user.email, pid:mine ? mine.id : (D.players[0] ? D.players[0].id : null), own:!!mine};
+  session = {email:user.email, pid:mine ? mine.id : (isAdmin ? null : (D.players[0] ? D.players[0].id : null)), own:!!mine};
   return true;
 }
 let persistT;
@@ -1295,7 +1333,8 @@ function mediaBlock(holder, p, opts={}){
       <div class="mhead"><h2>${tx('Dokumente','Documents')}</h2></div>
       <div class="grp alist" id="docs"><div class="arow empty-row">…</div></div>
       ${canEdit ? `<button class="btn ghost wide addbtn" id="dadd">${AI.plus}<span>${tx('Dokument hochladen','Upload document')}</span></button>` : ''}
-      <input type="file" accept=".pdf,.doc,.docx,image/*" multiple class="sr" id="din"></section>`;
+      <input type="file" accept=".pdf,.doc,.docx,image/*" multiple class="sr" id="din">
+      <input type="file" accept=".pdf,.doc,.docx,image/*" class="sr" id="gdin"></section>`;
   let imgs = [], urls = {}, th = {}, vw = {};
   const gal = $('#gal', holder), gin = $('#gin', holder), din = $('#din', holder);
   const drawGal = () => {
@@ -1317,13 +1356,28 @@ function mediaBlock(holder, p, opts={}){
     drawGal(); };
   const loadDocs = async () => {
     let docs = []; try{ docs = await MEDIA.list('player-docs', p.id); }catch(e){}
-    const missing = (p.docs || []).filter(d => !d.stored);
+    // Files Notion only links to (the PDF wasn't in the import). Only admins see them, with upload and remove.
+    const nn = n => String(n).toLowerCase().replace(/[\s_]+/g, ' ').trim();
+    const missing = isAdmin ? (p.docs || []).filter(d => !d.stored && !d.hidden && !docs.some(x => nn(niceName(x.name)) === nn(d.name))) : [];
     const box = $('#docs', holder);
     box.innerHTML = (docs.length || missing.length) ? docs.map((d, i) => `<div class="arow"><span class="dicon">${I.doc}</span><span class="amain"><b>${esc(niceName(d.name))}</b>${d.size ? `<small>${fmtSize(d.size)}</small>` : ''}</span>
         <button class="ib" data-open="${i}" aria-label="${tx('Öffnen','Open')}">${AI.dl}</button>${canEdit ? `<button class="ib del" data-del="${i}" aria-label="${tx('Löschen','Delete')}">${AI.trash}</button>` : ''}</div>`).join('')
-      + missing.map(d => `<div class="arow"><span class="dicon">${I.doc}</span><span class="amain"><b>${esc(d.name)}</b><small>${tx('In Notion verlinkt, PDF noch nicht hochgeladen','Linked in Notion, PDF not uploaded yet')}</small></span></div>`).join('')
+      + missing.map((d, i) => `<div class="arow ghost"><span class="dicon">${I.doc}</span><span class="amain"><b>${esc(d.name)}</b><small>${tx('Steht in Notion, Datei fehlt noch','Listed in Notion, file still missing')}</small></span>
+        <button class="ib" data-gup="${i}" aria-label="${tx('Datei hochladen','Upload file')}">${AI.plus}</button><button class="ib del" data-gdel="${i}" aria-label="${tx('Entfernen','Remove')}">${AI.trash}</button></div>`).join('')
       : `<div class="arow empty-row">${tx('Noch keine Dokumente','No documents yet')}</div>`;
     $$('[data-open]', box).forEach(x => x.onclick = async () => { const d = docs[+x.dataset.open]; try{ saveFile(niceName(d.name), await MEDIA.blob('player-docs', d.path)); }catch(e){ toast(tx('Datei konnte nicht geladen werden','Could not load the file')); } });
+    const gdin = $('#gdin', holder);
+    $$('[data-gup]', box).forEach(x => x.onclick = () => { const d = missing[+x.dataset.gup];
+      gdin.onchange = async () => { const f = gdin.files[0]; gdin.value = ''; if(!f) return;
+        if(f.size > MEDIA.maxBytes){ toast(tx(`${f.name} ist größer als 25 MB`, `${f.name} is larger than 25 MB`)); return; }
+        x.disabled = true;
+        try{ await MEDIA.upload('player-docs', p.id, f); d.stored = true; saveD(); toast(tx('Hochgeladen','Uploaded')); }
+        catch(e){ toast(tx('Upload fehlgeschlagen: ','Upload failed: ') + (e.message || '')); }
+        loadDocs(); };
+      gdin.click(); });
+    $$('[data-gdel]', box).forEach(x => x.onclick = () => { const d = missing[+x.dataset.gdel]; const row = x.closest('.arow'); row.classList.add('out');
+      d.hidden = true; saveD(); setTimeout(() => row.remove(), 230);   // hidden, not deleted: a new Notion import won't bring it back
+      toast(tx('Aus der Liste entfernt','Removed from the list'), {label:t('undo'), fn:() => { d.hidden = false; saveD(); loadDocs(); }}); });
     $$('[data-del]', box).forEach(x => x.onclick = () => { const d = docs[+x.dataset.del]; const row = x.closest('.arow'); row.classList.add('out');
       let undone = false; setTimeout(() => row.remove(), 230);
       toast(tx('Dokument gelöscht','Document deleted'), {label:t('undo'), fn:() => { undone = true; loadDocs(); }});
@@ -1477,6 +1531,7 @@ function renderLogin(){
     <form class="lcard glass st ${loginMode === 'admin' ? 'adm' : ''}" ${n()} novalidate>
       <div class="ltop"><b id="ltitle">${loginMode === 'admin' ? 'Admin-Login' : tx('Anmelden','Sign in')}</b>
         <button type="button" class="lkbtn ${loginMode === 'admin' ? 'on' : ''}" id="lock" aria-pressed="${loginMode === 'admin'}" aria-label="Admin-Login">${I.lock}</button></div>
+      <p class="adnote"><span>${tx('Nur für das NXT-Team. Als Spieler meldest du dich','Team only. Players sign in')} <button type="button" class="link" id="toPl">${tx('hier','here')}</button> ${tx('an.','instead.')}</span></p>
       <label class="field"><input id="em" type="email" inputmode="email" autocomplete="username" placeholder=" " required><span>${t('email')}</span></label>
       <p class="err" id="eEm"></p>
       <label class="field"><input id="pw" type="password" autocomplete="current-password" placeholder=" " required><span>${t('pw')}</span>
@@ -1492,6 +1547,7 @@ function renderLogin(){
     </form>
   </div>`;
   const em = $('#em'), pw = $('#pw');
+  $('#toPl').onclick = () => $('#lock').click();
   $('#lock').onclick = () => { loginMode = loginMode === 'admin' ? 'player' : 'admin'; const lk = $('#lock'); lk.classList.toggle('on', loginMode === 'admin'); lk.setAttribute('aria-pressed', loginMode === 'admin');
     $('.lcard').classList.toggle('adm', loginMode === 'admin');
     const tt = $('#ltitle'); tt.classList.remove('swap'); void tt.offsetWidth; tt.classList.add('swap'); tt.textContent = loginMode === 'admin' ? 'Admin-Login' : tx('Anmelden','Sign in');
@@ -1537,7 +1593,7 @@ function renderLogin(){
       if(asAdmin){ if(pw.value.trim() !== 'nxtstep'){ fail(t('wrongPw')); return false; } isAdmin = true; }
       return true; }, 700).then(ok => { if(!ok) return;
       const p = D.players.find(x => (x.email || '').toLowerCase() === mail);
-      session = {email:mail, pid:p ? p.id : (D.players[0] ? D.players[0].id : null), own:!!p};
+      session = {email:mail, pid:p ? p.id : (asAdmin ? null : (D.players[0] ? D.players[0].id : null)), own:!!p};
       if($('#rem').checked) LS.set('nxt_sess', session); else LS.sset('nxt_sess', session);
       enter();
     });
@@ -1659,14 +1715,18 @@ function scrollFx(){
 onscroll = scrollFx;
 
 /* ============ App shell ============ */
+const staffOnly = () => isAdmin && session && !session.own;            // admin account without its own player profile
+const previewing = () => staffOnly() && D.players.some(x => x.id === session.pid);
 function renderApp(){
+  if(staffOnly() && !previewing()){ root.innerHTML = `<div class="view"></div>`; $('.tabs')?.remove(); onscroll = null; if(!$('.admin')) openAdmin(); return; }
   const p = me();
   root.innerHTML = `<div class="view">
     <header class="hdr" id="hdr">
       <div class="brand">${mark()}<span>NXT STEP USA</span></div>
-      ${isAdmin ? `<button class="adminpill glass" id="toAdmin" aria-label="Admin">${I.lock}<span>Admin</span></button>` : ''}
-      <button class="gear glass" id="gear" aria-label="${t('settings')}">${I.gear}</button>
+      ${isAdmin ? `<button class="adminpill glass" id="toAdmin" aria-label="${previewing() ? tx('Zurück zum Admin','Back to admin') : 'Admin'}">${previewing() ? AI.back : I.lock}<span>Admin</span></button>` : ''}
+      ${previewing() ? '' : `<button class="gear glass" id="gear" aria-label="${t('settings')}">${I.gear}</button>`}
     </header>
+    ${previewing() ? `<div class="pvstrip"><span>${tx('Vorschau','Preview')}</span><b>${esc(p.name)}</b><small>${tx('So sieht der Spieler die App','What the player sees')}</small></div>` : ''}
     <main id="main"></main>
   </div>
   <nav class="tabs glass" role="tablist">
@@ -1674,7 +1734,7 @@ function renderApp(){
     ${[['path',I.liberty,'Pathway'],['profile',I.user,'Profile'],['res',I.book,'Resources']].map(([k,ic,l]) =>
       `<button role="tab" data-t="${k}" aria-selected="${tab===k}">${ic}<span>${l}</span></button>`).join('')}
   </nav>`;
-  $('#gear').onclick = openSettings;
+  $('#gear')?.addEventListener('click', openSettings);
   const ta = $('#toAdmin'); if(ta) ta.onclick = openAdmin;
   $$('.tabs button').forEach(b => b.onclick = () => switchTab(b.dataset.t));
   movePill(false);
@@ -1716,8 +1776,10 @@ function renderPath(m){
   const items = STEPS.map((s, idx) => {
     const state = idx < done ? 'done' : idx === cur ? 'cur' : 'lock';
     const chip = state === 'cur' ? `<span class="chip cur">${t('sCur')}</span>` : '';
-    return `<article class="task ${state} ${state==='cur'?'open':''}" data-i="${idx}">
-      <button class="hd" aria-expanded="${state==='cur'}">
+    // Everything starts closed; the current step opens once the liquid has arrived (right away with reduced motion)
+    const openNow = state === 'cur' && RM;
+    return `<article class="task ${state} ${openNow?'open':''}" data-i="${idx}">
+      <button class="hd" aria-expanded="${openNow}">
         <span class="tt"><b>${esc(tl(s.t))}</b><small>${esc(tl(s.s))}</small></span>${chip}${I.chev}</button>
       <div class="bd"><div><div class="in">
         ${tl(s.d) ? `<p>${esc(tl(s.d))}</p>` : ''}
@@ -1797,19 +1859,21 @@ function renderPath(m){
   }
   G = measure(); draw(G); setLevel(G, 0);
   // fill animation, every time Pathway opens
-  const dur = RM ? 0 : 1500 + done * 90, delay = RM ? 0 : 520;
+  const dur = RM ? 0 : 1700 + done * 110, delay = RM ? 0 : 520;
   const cc = $('.task.cur', path);
   if(cc && !RM) setTimeout(() => cc.scrollIntoView({block:'center', behavior:'smooth'}), 60);
   setTimeout(() => {
-    countUp($('#pctn'), 0, pct, dur);
+    countUp($('#pctn'), 0, pct, dur, true);
     const t0 = performance.now();
     (function f(now){
       if(!svg.isConnected) return;
       const x = Math.min(1, (now - t0) / Math.max(1, dur));
-      kNow = x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3)/2;
+      kNow = 1 - Math.pow(1 - x, 3);   // ease-out: rushes through the lower steps, slows towards the top
       G = measure(); setLevel(G, kNow);
       if(x < 1) requestAnimationFrame(f);
       else { svg.classList.add('live');
+        if(cc && !cc.classList.contains('open')){ cc.classList.add('open'); $('.hd', cc).setAttribute('aria-expanded', 'true');
+          setTimeout(() => { const r = cc.getBoundingClientRect(); if(r.bottom > innerHeight - 96) cc.scrollIntoView({block:'center', behavior:'smooth'}); }, 360); }
         const last = seen['prog_'+p.id] ?? 0;
         if(done >= N && last < N){ const r = svg.getBoundingClientRect(); confetti(r.left + VX, r.top + G.top); }
         seen['prog_'+p.id] = done; LS.set('nxt_seen', seen); }
@@ -1820,11 +1884,11 @@ function renderPath(m){
   ro.observe(path);
 }
 
-function countUp(el, a, b, dur){
+function countUp(el, a, b, dur, out){
   if(!el) return;
   if(RM || dur < 50){ el.textContent = b; return; }
   const t0 = performance.now();
-  (function f(now){ const k = Math.min(1, (now - t0)/dur), e = k < .5 ? 4*k*k*k : 1 - Math.pow(-2*k+2,3)/2;
+  (function f(now){ const k = Math.min(1, (now - t0)/dur), e = out ? 1 - Math.pow(1 - k, 3) : k < .5 ? 4*k*k*k : 1 - Math.pow(-2*k+2,3)/2;
     el.textContent = Math.round(a + (b - a)*e); if(k < 1) requestAnimationFrame(f); })(t0);
 }
 
@@ -1834,10 +1898,8 @@ function renderProfile(m){
   const vis = FIELDS.filter(f => f.v);
   m.innerHTML = `
     ${vid ? `<div class="vid" id="vid">
-      <img class="poster" src="https://i.ytimg.com/vi/${vid}/hqdefault.jpg" alt="" onerror="this.remove()">
-      <div class="shade"></div>
-      <button class="play" id="play" aria-label="Play">${I.play}</button>
-      <div class="vcap"><span>${t('video')}</span><span>YouTube</span></div>
+      <img class="poster" src="https://i.ytimg.com/vi/${vid}/maxresdefault.jpg" alt="" onload="if(this.naturalWidth<200&&!this.dataset.f){this.dataset.f=1;this.src=this.src.replace('maxresdefault','hqdefault')}" onerror="if(!this.dataset.f){this.dataset.f=1;this.src=this.src.replace('maxresdefault','hqdefault')}else this.remove()">
+      <button class="play" id="play" aria-label="${tx('Video abspielen','Play video')}">${I.play}</button>
     </div>
     <a class="ytlink st" style="--i:1" href="https://youtu.be/${vid}" target="_blank" rel="noopener">${tx('Auf YouTube ansehen','Watch on YouTube')} ${I.ext}</a>` : ''}
     <div class="pname st ${vid?'':'novid'}" style="--i:2"><div><h1>${esc(p.name)}</h1></div>
@@ -1931,7 +1993,7 @@ function openSheet(html, onReady){
   return close;
 }
 function openSettings(){
-  $('#gear').classList.add('on');
+  $('#gear')?.classList.add('on');
   const p = me();
   const segH = (key, opts) => `<div class="seg" data-k="${key}"><span class="thumb"></span>${opts.map(([v,l]) => `<button data-v="${v}" aria-pressed="${S[key]===v}">${t(l)}</button>`).join('')}</div>`;
   openSheet(`
@@ -2029,6 +2091,7 @@ function openAdmin(){
 }
 function closeAdmin(){
   const el = $('.admin'); if(!el) return;
+  if(staffOnly() && !previewing()) return;
   document.activeElement?.blur?.();
   el.classList.add('closing'); el.classList.remove('on'); setTimeout(() => el.remove(), 270); A.detail = null; renderApp();
 }
@@ -2038,11 +2101,12 @@ function aBar(){
     const label = A.detail.type === 'step' ? 'Pathway' : 'Profiles';
     bar.innerHTML = `<div class="abrow"><button class="aback" id="aback">${AI.back}<span>${label}</span></button><span class="astatus" id="astatus" aria-live="polite"></span><button class="adone" id="adone">${tx('Fertig','Done')}</button></div>`;
   } else {
-    bar.innerHTML = `<div class="abrow"><h3>Admin</h3><button class="close" id="aclose" aria-label="${tx('Schließen','Close')}">${I.x}</button></div>
+    bar.innerHTML = `<div class="abrow"><h3>Admin</h3>${staffOnly() ? `<button class="close" id="agear" aria-label="${t('settings')}">${I.gear}</button>` : `<button class="close" id="aclose" aria-label="${tx('Schließen','Close')}">${I.x}</button>`}</div>
       <div class="seg" id="aseg"><span class="thumb"></span>${[['path','Pathway'],['profiles','Profiles'],['res','Resources']].map(([k,l]) => `<button data-a="${k}" aria-pressed="${A.tab===k}">${l}</button>`).join('')}</div>`;
     const seg = $('#aseg', bar); segInit(seg);
     $$('button', seg).forEach(b => b.onclick = () => { if(A.tab === b.dataset.a) return; A.tab = b.dataset.a; segSet(seg, b); aRender(0, true); });
-    $('#aclose', bar).onclick = closeAdmin;
+    const ac = $('#aclose', bar); if(ac) ac.onclick = closeAdmin;
+    const ag = $('#agear', bar); if(ag) ag.onclick = openSettings;
   }
 }
 function aRender(dir=0, keepBar=false){
@@ -2453,7 +2517,7 @@ function aPlayerEdit(b, id){
   let mail0 = p.email;
   f.email.addEventListener('blur', async () => { save.now(); if(!CLOUD || !p.user_id || p.email === mail0 || !/^\S+@\S+\.\S+$/.test(p.email)) return;
     try{ await adminCall('email', {player_id:p.id, email:p.email}); mail0 = p.email; toast(tx('Login-E-Mail geändert','Login email changed')); drawAcc(); }catch(e){ toast(e.message); } });
-  $('#pview', b).onclick = () => { save.now(); if(!p.name) p.name = tx('Neuer Spieler','New player'); saveD(); session = Object.assign({}, session, {pid:p.id}); LS.set('nxt_sess', session); tab = 'profile'; closeAdmin(); setTimeout(() => toast(t('viewing',{n:p.name})), 300); };
+  $('#pview', b).onclick = () => { save.now(); if(!p.name) p.name = tx('Neuer Spieler','New player'); saveD(); session = Object.assign({}, session, {pid:p.id}); if(!staffOnly()) LS.set('nxt_sess', session); tab = 'profile'; closeAdmin(); setTimeout(() => toast(t('viewing',{n:p.name})), 300); };
   $('#pdel', b).onclick = () => { const i = D.players.indexOf(p); D.players.splice(i,1); saveD(); deleteLater(p); go2(null, -1);
     toast(tx('Profil gelöscht','Profile deleted'), {label:t('undo'), fn:() => { D.players.splice(i,0,p); saveD(); if(!A.detail && A.tab === 'profiles') aRender(0, true); }}); };
 }
