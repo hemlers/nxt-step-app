@@ -658,7 +658,7 @@ input[type=search]::-webkit-search-cancel-button,input[type=search]::-webkit-sea
   main{padding-left:16px;padding-right:16px}
   .vid{margin:0 -16px}
   :root[data-look=neutral] .banner{margin-left:-16px;margin-right:-16px}
-  h1{font-size:28px}.pname h1{font-size:28px}.pct{font-size:46px}
+  h1{font-size:28px}.pname h1{font-size:28px}
   .admin .wrap{padding-left:14px;padding-right:14px}
   .abar{padding-left:14px;padding-right:14px}
   .ahead{margin:0 -14px}
@@ -861,6 +861,20 @@ h1,h2,h3,p,b,small,span,a,label,button{overflow-wrap:break-word}
 .pvstrip b{font-weight:800;min-width:0;overflow-wrap:anywhere}
 .pvstrip small{color:var(--mute);font-size:12.5px}
 .admin .abrow .close svg{width:20px;height:20px}
+
+/* v11c: Glas-Sheet beim Farbwechsel kurz deckend, sonst scheint die Schrift dahinter durch */
+:root.vt .sheet{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:var(--panel)!important}
+
+/* v11d: Prozent als kleine Bubble neben der Überschrift */
+.ph{display:block;margin-top:6px}
+.phrow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.phrow h1{min-width:0;margin:0}
+.pct{flex:none;min-width:4.3em;text-align:center;font-variant-numeric:tabular-nums;font-size:20px;font-weight:800;line-height:1;letter-spacing:-.01em;white-space:nowrap;padding:8px 13px 8px 14px;border-radius:999px;
+  color:var(--goldInk);background:color-mix(in srgb,var(--gold) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 45%,transparent);
+  transition:background-color 300ms ease,color 300ms ease}
+.pct small{font-size:.7em;margin-left:1px;color:inherit;opacity:.75}
+.pct.full{background:var(--gold);color:var(--onGold);box-shadow:none}
+@media (max-width:420px){.pct{font-size:clamp(17px,4.8vw,20px)}}
 </style>
 </head>
 <body>
@@ -1790,10 +1804,10 @@ function renderPath(m){
   }).reverse().join('');
   m.innerHTML = `
     <div class="banner" style="background-image:url(img/yale.jpg)"></div>
-    <div class="ph"><div><p class="sub st" style="--i:0">${t('hi')} ${esc(p.name.split(' ')[0])}</p>
-      <h1 class="st" style="--i:1">${t('pathT')}</h1>
-      <p class="sub st" style="--i:2">${cur >= 0 ? t('stepOf',{a:done+1,b:N}) : t('finished')}</p></div>
-      <div class="pct num st" style="--i:3" aria-label="${pct}%"><span id="pctn">0</span><small>%</small></div></div>
+    <div class="ph"><p class="sub st" style="--i:0">${t('hi')} ${esc(p.name.split(' ')[0])}</p>
+      <div class="phrow"><h1 class="st" style="--i:1">${t('pathT')}</h1>
+        <div class="pct num st ${pct >= 100 ? 'full' : ''}" style="--i:2" aria-label="${pct}%"><span id="pctn">0</span><small>%</small></div></div>
+      <p class="sub st" style="--i:3">${cur >= 0 ? t('stepOf',{a:done+1,b:N}) : t('finished')}</p></div>
     <section class="path" id="path">
       <svg class="vessel" id="ves" width="44" aria-hidden="true">
         <defs>
@@ -2024,7 +2038,9 @@ function openSettings(){
       if(k === 'theme'){
         const r = b.getBoundingClientRect(); const de = document.documentElement;
         de.style.setProperty('--vx', (r.left + r.width/2) + 'px'); de.style.setProperty('--vy', (r.top + r.height/2) + 'px');
-        if(document.startViewTransition && !RM) document.startViewTransition(applySettings); else applySettings();
+        // The transition works with snapshots, and snapshots lose the glass blur. So the sheet is solid while it runs.
+        if(document.startViewTransition && !RM){ de.classList.add('vt'); const vt = document.startViewTransition(applySettings); vt.finished.finally(() => de.classList.remove('vt')); }
+        else applySettings();
       } else if(k === 'look'){ applySettings(); }
       else { applySettings(); setTimeout(() => { close(); renderApp(); if($('.admin')) aRender(); }, 260); }   // the admin area redraws too
     }); });
