@@ -2026,7 +2026,7 @@ function openSettings(){
         de.style.setProperty('--vx', (r.left + r.width/2) + 'px'); de.style.setProperty('--vy', (r.top + r.height/2) + 'px');
         if(document.startViewTransition && !RM) document.startViewTransition(applySettings); else applySettings();
       } else if(k === 'look'){ applySettings(); }
-      else { applySettings(); setTimeout(() => { close(); renderApp(); }, 260); }
+      else { applySettings(); setTimeout(() => { close(); renderApp(); if($('.admin')) aRender(); }, 260); }   // the admin area redraws too
     }); });
     $$('.mrow[data-x]', sh).forEach(r => r.onclick = () => {
       const x = $('#x' + r.dataset.x, sh); const o = !x.classList.contains('open');
@@ -2049,7 +2049,8 @@ function openSettings(){
         if(!ok){ ea.textContent = t('wrongPw'); ea.classList.add('show'); const f = $('#ap', sh).closest('.field'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); $('#ap', sh).select(); return; }
         isAdmin = true; close(); setTimeout(openAdmin, 200); }); };
     $('#inst', sh).onclick = () => { close(); setTimeout(() => fadeOut(() => go('install')), 220); };
-    $('#lo', sh).onclick = async () => { close(); LS.del('nxt_sess'); session = null; isAdmin = false; loginMode = 'player'; if(CLOUD){ try{ await sb.auth.signOut(); }catch(e){} cloudUser = null; D.players = []; } setTimeout(() => { $('.tabs')?.remove(); fadeOut(() => go('login')); }, 220); };
+    $('#lo', sh).onclick = async () => { close(); const ad = $('.admin'); if(ad){ ad.classList.remove('on'); setTimeout(() => ad.remove(), 260); } A.detail = null;
+      LS.del('nxt_sess'); session = null; isAdmin = false; loginMode = 'player'; if(CLOUD){ try{ await sb.auth.signOut(); }catch(e){} cloudUser = null; D.players = []; } setTimeout(() => { $('.tabs')?.remove(); fadeOut(() => go('login')); }, 220); };
   });
 }
 
